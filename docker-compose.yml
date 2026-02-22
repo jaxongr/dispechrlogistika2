@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dispatchr_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dispatchr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dispatchr_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-dispatchr_logistics}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-dispatchr}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dispatchr_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dispatchr_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dispatchr}:${POSTGRES_PASSWORD:-dispatchr_secret}@postgres:5432/${POSTGRES_DB:-dispatchr_logistics}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - '${API_PORT:-3000}:3000'
+    env_file:
+      - .env
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: dispatchr_admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '${ADMIN_PORT:-8080}:80'
+
+volumes:
+  postgres_data:
+  redis_data:

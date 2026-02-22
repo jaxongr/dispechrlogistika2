@@ -1,0 +1,570 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum PlanType {
+  TRIAL
+  DAILY
+  WEEKLY
+  MONTHLY
+  GRANDFATHER
+}
+
+enum PaymentMethod {
+  CLICK
+  PAYME
+  MANUAL
+  REFERRAL
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum VipCodeStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum ReferralStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  REVOKED
+}
+
+// ============================================
+// 1. Message (messages)
+// ============================================
+model Message {
+  id          Int       @id @default(autoincrement())
+  chatId      BigInt    @map("chat_id")
+  messageId   Int       @map("message_id")
+  senderId    BigInt?   @map("sender_id")
+  senderName  String?   @map("sender_name")
+  senderPhone String?   @map("sender_phone")
+  text        String?
+  textHash    String?   @map("text_hash")
+  groupTitle  String?   @map("group_title")
+  isForwarded Boolean   @default(false) @map("is_forwarded")
+  isFiltered  Boolean   @default(false) @map("is_filtered")
+  filterStage Int?      @map("filter_stage")
+  filterNote  String?   @map("filter_note")
+  isPosted    Boolean   @default(false) @map("is_posted")
+  postedAt    DateTime? @map("posted_at")
+  sessionId   Int?      @map("session_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([chatId, messageId])
+  @@index([senderId])
+  @@index([textHash])
+  @@index([createdAt])
+  @@index([isPosted])
+  @@map("messages")
+}
+
+// ============================================
+// 2. PhoneNumber (phone_numbers)
+// ============================================
+model PhoneNumber {
+  id          Int      @id @default(autoincrement())
+  phone       String
+  normalPhone String   @map("normal_phone")
+  senderId    BigInt?  @map("sender_id")
+  messageId   Int?     @map("message_id")
+  chatId      BigInt?  @map("chat_id")
+  source      String   @default("message")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([normalPhone])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("phone_numbers")
+}
+
+// ============================================
+// 3. BlockedUser (blocked_users)
+// ============================================
+model BlockedUser {
+  id          Int      @id @default(autoincrement())
+  userId      BigInt   @map("user_id")
+  username    String?
+  firstName   String?  @map("first_name")
+  lastName    String?  @map("last_name")
+  phone       String?
+  reason      String?
+  blockedBy   String   @default("0") @map("blocked_by")
+  smsNotified Boolean  @default(false) @map("sms_notified")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([phone])
+  @@index([createdAt])
+  @@map("blocked_users")
+}
+
+// ============================================
+// 4. AIBlockedUser (ai_blocked_users) — max 22,000
+// ============================================
+model AIBlockedUser {
+  id             Int      @id @default(autoincrement())
+  userId         BigInt   @map("user_id")
+  username       String?
+  firstName      String?  @map("first_name")
+  lastName       String?  @map("last_name")
+  phone          String?
+  reason         String?
+  confidence     Float    @default(0)
+  keywords       String[] @default([])
+  messagePreview String?  @map("message_preview")
+  smsNotified    Boolean  @default(false) @map("sms_notified")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([confidence])
+  @@index([createdAt])
+  @@map("ai_blocked_users")
+}
+
+// ============================================
+// 5. BotUser (bot_users)
+// ============================================
+model BotUser {
+  id            Int       @id @default(autoincrement())
+  telegramId    BigInt    @unique @map("telegram_id")
+  username      String?
+  firstName     String?   @map("first_name")
+  lastName      String?   @map("last_name")
+  phone         String?
+  languageCode  String?   @map("language_code")
+  referredBy    String?   @map("referred_by")
+  isBlocked     Boolean   @default(false) @map("is_blocked")
+  lastActiveAt  DateTime? @map("last_active_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+  payments      Payment[]
+  balance       UserBalance?
+  vipUser       VipUser?
+
+  @@index([username])
+  @@index([referredBy])
+  @@index([createdAt])
+  @@map("bot_users")
+}
+
+// ============================================
+// 6. Subscription (subscriptions)
+// ============================================
+model Subscription {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  telegramId BigInt   @map("telegram_id")
+  planType   PlanType @map("plan_type")
+  startDate  DateTime @map("start_date")
+  endDate    DateTime @map("end_date")
+  isActive   Boolean  @default(true) @map("is_active")
+  paymentId  Int?     @map("payment_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user    BotUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([telegramId])
+  @@index([isActive])
+  @@index([endDate])
+  @@index([planType])
+  @@map("subscriptions")
+}
+
+// ============================================
+// 7. Payment (payments)
+// ============================================
+model Payment {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  telegramId    BigInt        @map("telegram_id")
+  planType      PlanType      @map("plan_type")
+  amount        Int
+  currency      String        @default("UZS")
+  paymentMethod PaymentMethod @map("payment_method")
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique @map("transaction_id")
+  referralCode  String?       @map("referral_code")
+  metadata      Json?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  user          BotUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@index([telegramId])
+  @@index([status])
+  @@index([paymentMethod])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+// ============================================
+// 8. PaymeTransaction (payme_transactions)
+// ============================================
+model PaymeTransaction {
+  id            Int      @id @default(autoincrement())
+  transactionId String   @unique @map("transaction_id")
+  paymeId       String?  @unique @map("payme_id")
+  telegramId    BigInt   @map("telegram_id")
+  planType      PlanType @map("plan_type")
+  amount        Int
+  state         Int      @default(1)
+  createTime    BigInt   @map("create_time")
+  performTime   BigInt?  @map("perform_time")
+  cancelTime    BigInt?  @map("cancel_time")
+  reason        Int?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([telegramId])
+  @@index([state])
+  @@map("payme_transactions")
+}
+
+// ============================================
+// 9. Driver (drivers)
+// ============================================
+model Driver {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt   @unique @map("telegram_id")
+  firstName  String?  @map("first_name")
+  lastName   String?  @map("last_name")
+  phone      String?
+  carModel   String?  @map("car_model")
+  carNumber  String?  @map("car_number")
+  region     String?
+  isActive   Boolean  @default(true) @map("is_active")
+  rating     Float    @default(5.0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  bookings DriverBooking[]
+
+  @@index([region])
+  @@index([isActive])
+  @@map("drivers")
+}
+
+// ============================================
+// 10. DriverBooking (driver_bookings)
+// ============================================
+model DriverBooking {
+  id          Int       @id @default(autoincrement())
+  driverId    Int       @map("driver_id")
+  orderId     Int?      @map("order_id")
+  fromRegion  String    @map("from_region")
+  toRegion    String    @map("to_region")
+  status      String    @default("pending")
+  bookedAt    DateTime  @default(now()) @map("booked_at")
+  completedAt DateTime? @map("completed_at")
+
+  driver Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  order  BotOrder? @relation(fields: [orderId], references: [id])
+
+  @@index([driverId])
+  @@index([status])
+  @@map("driver_bookings")
+}
+
+// ============================================
+// 11. VipUser (vip_users) — max 1,000
+// ============================================
+model VipUser {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @unique @map("user_id")
+  telegramId     BigInt    @unique @map("telegram_id")
+  vipCode        String    @unique @map("vip_code")
+  isActive       Boolean   @default(true) @map("is_active")
+  totalEarnings  Int       @default(0) @map("total_earnings")
+  totalReferrals Int       @default(0) @map("total_referrals")
+  activatedAt    DateTime  @default(now()) @map("activated_at")
+  suspendedAt    DateTime? @map("suspended_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  user     BotUser              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrals VipReferral[]
+  earnings  ReferralEarning[]
+  tracking  VipReferralTracking[]
+
+  @@index([isActive])
+  @@map("vip_users")
+}
+
+// ============================================
+// 12. VipReferral (vip_referrals)
+// ============================================
+model VipReferral {
+  id        Int           @id @default(autoincrement())
+  vipUserId Int           @map("vip_user_id")
+  code      String        @unique
+  status    VipCodeStatus @default(ACTIVE)
+  usedBy    BigInt?       @map("used_by")
+  usedAt    DateTime?     @map("used_at")
+  expiresAt DateTime?     @map("expires_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  vipUser VipUser @relation(fields: [vipUserId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([status])
+  @@index([vipUserId])
+  @@map("vip_referrals")
+}
+
+// ============================================
+// 13. ReferralCode (referral_codes)
+// ============================================
+model ReferralCode {
+  id            Int            @id @default(autoincrement())
+  code          String         @unique
+  ownerTgId     BigInt         @map("owner_tg_id")
+  status        ReferralStatus @default(ACTIVE)
+  totalUses     Int            @default(0) @map("total_uses")
+  totalEarnings Int            @default(0) @map("total_earnings")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  stats ReferralStat[]
+
+  @@index([ownerTgId])
+  @@index([status])
+  @@map("referral_codes")
+}
+
+// ============================================
+// 14. ReferralStat (referral_stats)
+// ============================================
+model ReferralStat {
+  id             Int       @id @default(autoincrement())
+  referralCodeId Int       @map("referral_code_id")
+  referredTgId   BigInt    @map("referred_tg_id")
+  hasPaid        Boolean   @default(false) @map("has_paid")
+  firstPaymentAt DateTime? @map("first_payment_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  referralCode ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([referralCodeId, referredTgId])
+  @@index([referredTgId])
+  @@map("referral_stats")
+}
+
+// ============================================
+// 15. ReferralEarning (referral_earnings)
+// ============================================
+model ReferralEarning {
+  id              Int      @id @default(autoincrement())
+  vipUserId       Int      @map("vip_user_id")
+  referredTgId    BigInt   @map("referred_tg_id")
+  planType        PlanType @map("plan_type")
+  paymentAmount   Int      @map("payment_amount")
+  cashbackAmount  Int      @map("cashback_amount")
+  cashbackPercent Int      @map("cashback_percent")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  vipUser VipUser @relation(fields: [vipUserId], references: [id], onDelete: Cascade)
+
+  @@index([vipUserId])
+  @@index([createdAt])
+  @@map("referral_earnings")
+}
+
+// ============================================
+// 16. TelegramGroup (telegram_groups)
+// ============================================
+model TelegramGroup {
+  id            Int       @id @default(autoincrement())
+  chatId        BigInt    @unique @map("chat_id")
+  title         String?
+  username      String?
+  memberCount   Int?      @map("member_count")
+  isPriority    Boolean   @default(false) @map("is_priority")
+  sessionId     Int?      @map("session_id")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastMessageAt DateTime? @map("last_message_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([sessionId])
+  @@index([isPriority])
+  @@index([isActive])
+  @@map("telegram_groups")
+}
+
+// ============================================
+// 17. BlockedPhone (blocked_phones)
+// ============================================
+model BlockedPhone {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  reason    String?
+  blockedBy String?  @map("blocked_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("blocked_phones")
+}
+
+// ============================================
+// 18. DispatcherPhone (dispatcher_phones)
+// ============================================
+model DispatcherPhone {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  name      String?
+  company   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([isActive])
+  @@map("dispatcher_phones")
+}
+
+// ============================================
+// 19. UserBalance (user_balances)
+// ============================================
+model UserBalance {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique @map("user_id")
+  telegramId BigInt   @unique @map("telegram_id")
+  balance    Int      @default(0)
+  totalEarned Int     @default(0) @map("total_earned")
+  totalSpent  Int     @default(0) @map("total_spent")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user BotUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_balances")
+}
+
+// ============================================
+// 20. PaymentSettings (payment_settings)
+// ============================================
+model PaymentSettings {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_settings")
+}
+
+// ============================================
+// 21. VipReferralTracking (vip_referral_tracking)
+// ============================================
+model VipReferralTracking {
+  id           Int      @id @default(autoincrement())
+  vipUserId    Int      @map("vip_user_id")
+  referredTgId BigInt   @map("referred_tg_id")
+  action       String
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  vipUser VipUser @relation(fields: [vipUserId], references: [id], onDelete: Cascade)
+
+  @@index([vipUserId])
+  @@index([referredTgId])
+  @@index([createdAt])
+  @@map("vip_referral_tracking")
+}
+
+// ============================================
+// 22. VipQualification (vip_qualifications)
+// ============================================
+model VipQualification {
+  id                 Int       @id @default(autoincrement())
+  telegramId         BigInt    @unique @map("telegram_id")
+  dispatchersBlocked Int       @default(0) @map("dispatchers_blocked")
+  isQualified        Boolean   @default(false) @map("is_qualified")
+  qualifiedAt        DateTime? @map("qualified_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("vip_qualifications")
+}
+
+// ============================================
+// 23. DispatcherReport (dispatcher_reports)
+// ============================================
+model DispatcherReport {
+  id               Int      @id @default(autoincrement())
+  reportDate       DateTime @unique @map("report_date")
+  totalMessages    Int      @default(0) @map("total_messages")
+  filteredMessages Int      @default(0) @map("filtered_messages")
+  postedMessages   Int      @default(0) @map("posted_messages")
+  blockedUsers     Int      @default(0) @map("blocked_users")
+  aiBlocked        Int      @default(0) @map("ai_blocked")
+  newUsers         Int      @default(0) @map("new_users")
+  activeUsers      Int      @default(0) @map("active_users")
+  revenue          Int      @default(0)
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("dispatcher_reports")
+}
+
+// ============================================
+// 24. BotOrder (bot_orders)
+// ============================================
+model BotOrder {
+  id          Int       @id @default(autoincrement())
+  telegramId  BigInt    @map("telegram_id")
+  fromRegion  String    @map("from_region")
+  toRegion    String    @map("to_region")
+  cargoType   String?   @map("cargo_type")
+  weight      Float?
+  phone       String?
+  description String?
+  status      String    @default("new")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  bookings DriverBooking[]
+
+  @@index([telegramId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("bot_orders")
+}
+
+// ============================================
+// 25. ScheduledPost (scheduled_posts)
+// ============================================
+model ScheduledPost {
+  id          Int       @id @default(autoincrement())
+  chatId      BigInt    @map("chat_id")
+  text        String
+  mediaUrl    String?   @map("media_url")
+  mediaType   String?   @map("media_type")
+  scheduledAt DateTime  @map("scheduled_at")
+  isSent      Boolean   @default(false) @map("is_sent")
+  sentAt      DateTime? @map("sent_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([scheduledAt])
+  @@index([isSent])
+  @@map("scheduled_posts")
+}
