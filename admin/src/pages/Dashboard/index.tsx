@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  Row, Col, Card, Statistic, Spin, Alert, Typography, Divider, Tag, Space, Progress,
+  Row, Col, Card, Statistic, Spin, Typography, Divider, Tag, Space, Progress, Alert,
 } from "antd";
 import {
   UserOutlined, CrownOutlined, DollarOutlined, ThunderboltOutlined,
@@ -11,46 +11,45 @@ import type { DashboardStats } from "../../types";
 
 const { Title, Text } = Typography;
 
+const defaultStats: DashboardStats = {
+  users: { total: 0, active: 0, blocked: 0 },
+  subscriptions: { total: 0, active: 0, byPlan: {} },
+  payments: { total: 0, completed: 0, totalRevenue: 0 },
+  vip: { total: 0, active: 0, remaining: 0 },
+};
+
 const Dashboard: React.FC = () => {
-  const { data: usersStats, isLoading: usersLoading, error: usersError } = useQuery({
+  const { data: usersStats, isLoading: usersLoading, isError: usersErr } = useQuery({
     queryKey: ["dashboard", "users-stats"],
     queryFn: () => botUsersApi.stats(),
     refetchInterval: 30000,
+    retry: 2,
   });
-  const { data: subsStats, isLoading: subsLoading, error: subsError } = useQuery({
+  const { data: subsStats, isLoading: subsLoading, isError: subsErr } = useQuery({
     queryKey: ["dashboard", "subscriptions-stats"],
     queryFn: () => subscriptionsApi.stats(),
     refetchInterval: 30000,
+    retry: 2,
   });
-  const { data: payStats, isLoading: payLoading, error: payError } = useQuery({
+  const { data: payStats, isLoading: payLoading, isError: payErr } = useQuery({
     queryKey: ["dashboard", "payments-stats"],
     queryFn: () => paymentsApi.stats(),
     refetchInterval: 30000,
+    retry: 2,
   });
-  const { data: vipStats, isLoading: vipLoading, error: vipError } = useQuery({
+  const { data: vipStats, isLoading: vipLoading, isError: vipErr } = useQuery({
     queryKey: ["dashboard", "vip-stats"],
     queryFn: () => vipApi.stats(),
     refetchInterval: 30000,
+    retry: 2,
   });
 
   const isLoading = usersLoading || subsLoading || payLoading || vipLoading;
-  const hasError = usersError || subsError || payError || vipError;
-  const users: DashboardStats["users"] = usersStats?.data ?? { total: 0, active: 0, blocked: 0 };
-  const subscriptions: DashboardStats["subscriptions"] = subsStats?.data ?? { total: 0, active: 0, byPlan: {} };
-  const payments: DashboardStats["payments"] = payStats?.data ?? { total: 0, completed: 0, totalRevenue: 0 };
-  const vip: DashboardStats["vip"] = vipStats?.data ?? { total: 0, active: 0, remaining: 0 };
-
-  if (hasError) {
-    return (
-      <Alert
-        message="Xatolik yuz berdi"
-        description="Server bilan muammo yuz berdi."
-        type="error"
-        showIcon
-        style={{ marginBottom: 24 }}
-      />
-    );
-  }
+  const hasError = usersErr || subsErr || payErr || vipErr;
+  const users: DashboardStats["users"] = usersStats?.data ?? defaultStats.users;
+  const subscriptions: DashboardStats["subscriptions"] = subsStats?.data ?? defaultStats.subscriptions;
+  const payments: DashboardStats["payments"] = payStats?.data ?? defaultStats.payments;
+  const vip: DashboardStats["vip"] = vipStats?.data ?? defaultStats.vip;
 
   return (
     <Spin spinning={isLoading} size="large">
@@ -58,6 +57,16 @@ const Dashboard: React.FC = () => {
         <Title level={3} style={{ marginBottom: 4 }}>Boshqaruv paneli</Title>
         <Text type="secondary">Real vaqt statistikasi</Text>
       </div>
+      {hasError && (
+        <Alert
+          message="Backend bilan aloqa muammosi"
+          description="Ba'zi statistikalar yuklanmadi. Backend ishlayotganini tekshiring."
+          type="warning"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Row gutter={[20, 20]}>
         <Col xs={24} sm={12} lg={6}>
           <Card bordered={false} style={{ borderRadius: 12, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
@@ -103,12 +112,13 @@ const Dashboard: React.FC = () => {
             {Object.entries(subscriptions.byPlan || {}).map(([plan, count]) => {
               const colors: Record<string, string> = { TRIAL: "#8c8c8c", DAILY: "#1890ff", WEEKLY: "#52c41a", MONTHLY: "#722ed1", GRANDFATHER: "#faad14" };
               const total = subscriptions.total || 1;
-              const percent = Math.round(((count as number) / total) * 100);
+              const num = typeof count === "number" ? count : 0;
+              const percent = Math.round((num / total) * 100);
               return (
                 <div key={plan} style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                     <Tag color={colors[plan] || "default"}>{plan}</Tag>
-                    <Text strong>{count as number} ({percent}%)</Text>
+                    <Text strong>{num} ({percent}%)</Text>
                   </div>
                   <Progress percent={percent} showInfo={false} strokeColor={colors[plan] || "#1890ff"} size="small" />
                 </div>

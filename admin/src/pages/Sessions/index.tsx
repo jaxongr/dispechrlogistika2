@@ -26,7 +26,7 @@ const sConf: Record<string, { color: string; badge: "success" | "error" | "proce
 };
 
 const Sessions: React.FC = () => {
-  const [, setR] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const connected = sessions.filter((s) => s.status === "CONNECTED").length;
   const totalGroups = sessions.reduce((a, s) => a + s.groupCount, 0);
   const totalQueued = sessions.reduce((a, s) => a + s.messagesQueued, 0);
@@ -49,7 +49,7 @@ const Sessions: React.FC = () => {
         <Col xs={24} sm={12} md={6}><Card bordered={false} style={{ borderRadius: 12 }}><Statistic title="Navbatda" value={totalQueued} prefix={<ClockCircleOutlined />} valueStyle={{ color: totalQueued > 20 ? "#ff4d4f" : "#faad14", fontWeight: 600 }} /></Card></Col>
         <Col xs={24} sm={12} md={6}><Card bordered={false} style={{ borderRadius: 12 }}><Statistic title="Yuborilgan" value={totalSent} prefix={<ThunderboltOutlined />} valueStyle={{ color: "#52c41a", fontWeight: 600 }} /></Card></Col>
       </Row>
-      <div style={{ marginBottom: 16, textAlign: "right" }}><Button icon={<ReloadOutlined />} onClick={() => setR(true)}>Yangilash</Button></div>
+      <div style={{ marginBottom: 16, textAlign: "right" }}><Button icon={<ReloadOutlined />} onClick={() => setRefreshKey((k) => k + 1)}>Yangilash</Button></div>
       <Row gutter={[16, 16]}>
         {sessions.map((s) => {
           const c = sConf[s.status];
