@@ -26,7 +26,7 @@ const sConf: Record<string, { color: string; badge: "success" | "error" | "proce
 };
 
 const Sessions: React.FC = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [_refreshKey, setRefreshKey] = useState(0);
   const connected = sessions.filter((s) => s.status === "CONNECTED").length;
   const totalGroups = sessions.reduce((a, s) => a + s.groupCount, 0);
   const totalQueued = sessions.reduce((a, s) => a + s.messagesQueued, 0);
