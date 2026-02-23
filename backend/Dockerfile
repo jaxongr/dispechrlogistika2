@@ -26,6 +26,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 
+RUN mkdir -p /app/logs && chown node:node /app/logs
+
 ENV NODE_ENV=production
 
 EXPOSE 3000
