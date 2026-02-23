@@ -51,7 +51,7 @@ const Settings: React.FC = () => {
                 <Col span={12}><Form.Item name="timeWindow" label="Vaqt (daq)" rules={[{ required: true }]}><InputNumber min={1} max={60} style={{ width: "100%" }} /></Form.Item></Col>
               </Row>
               <Form.Item name="duration" label="Bloklash (soat)" rules={[{ required: true }]}><InputNumber min={1} max={720} style={{ width: "100%" }} addonAfter="soat" /></Form.Item>
-              <Divider orientation="left" plain><Text type="secondary">AI aniqlash</Text></Divider>
+              <Divider plain><Text type="secondary">AI aniqlash</Text></Divider>
               <Form.Item name="aiEnabled" label="AI spam" valuePropName="checked"><Switch checkedChildren="On" unCheckedChildren="Off" /></Form.Item>
               <Form.Item name="aiThreshold" label={<Space><span>Ishonch chegarasi</span><Tooltip title="Min foiz"><InfoCircleOutlined /></Tooltip></Space>} rules={[{ required: true }]}><InputNumber min={50} max={100} style={{ width: "100%" }} addonAfter="%" /></Form.Item>
               <Divider />

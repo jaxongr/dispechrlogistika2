@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Switch, Typography, theme } from 'antd';
+import { Layout, Menu, Switch, Typography } from 'antd';
 import {
   DashboardOutlined,
   NotificationOutlined,
