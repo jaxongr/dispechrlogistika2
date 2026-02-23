@@ -1,14 +1,10 @@
-import { Controller, Get, UseGuards, Query } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { VipUserService } from './vip-user.service.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../auth/guards/roles.guard.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 
 @ApiTags('VIP & Referral')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Public()
 @Controller('api/vip')
 export class ReferralController {
   constructor(private readonly vipUserService: VipUserService) {}

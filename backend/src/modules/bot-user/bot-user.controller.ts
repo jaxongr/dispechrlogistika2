@@ -4,19 +4,14 @@ import {
   Param,
   Query,
   Patch,
-  UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { BotUserService } from './bot-user.service.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../auth/guards/roles.guard.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 
 @ApiTags('Bot Users')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Public()
 @Controller('api/bot-users')
 export class BotUserController {
   constructor(private readonly botUserService: BotUserService) {}
